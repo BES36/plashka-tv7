@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <script>
-  // 👇 ВСТАВЬТЕ ВАШ КЛЮЧ МЕЖДУ КАВЫЧЕК:
+  // 👇 ВСТАВЬТЕ ВАШ КЛЮЧ ОТ WEATHERAPI.COM МЕЖДУ КАВЫЧЕК:
   const MY_KEY = "https://api.weatherapi.com/v1/current.json?key=5232fcf019b642c497a103208260311&q=Kirensk";
 </script>
 <style>
@@ -49,35 +49,49 @@
     let step = 0;
     let currentTemp = "ЗАГРУЗКА...";
 
+    // 1. Попытка получить погоду с WeatherAPI.com через JSONP (в обход CORS)
     function fetchWeather() {
       const cleanKey = MY_KEY.trim();
       if (!cleanKey || cleanKey === "ВСТАВИТЬ_СЮДА") {
-        currentTemp = "НЕТ КЛЮЧА";
+        fetchFallbackWeather();
         return;
       }
 
-      const url = `https://weatherapi.com{cleanKey}&q=Kirensk&aqi=no`;
-      const xhr = new XMLHttpRequest();
-      xhr.open("GET", url, true);
+      const oldScript = document.getElementById("jsonp-weather");
+      if (oldScript) oldScript.remove();
+
+      const script = document.createElement("script");
+      script.id = "jsonp-weather";
+      script.src = `https://weatherapi.com{cleanKey}&q=Kirensk&callback=handleWeatherAPI`;
       
-      xhr.onreadystatechange = function () {
-        if (xhr.readyState === 4) {
-          if (xhr.status === 200) {
-            try {
-              const data = JSON.parse(xhr.responseText);
-              const temp = Math.round(data.current.temp_c);
-              currentTemp = (temp > 0 ? `+${temp}` : `${temp}`) + "°C";
-            } catch (e) {
-              currentTemp = "ERR JSON";
-            }
-          } else if (xhr.status === 0) {
-            currentTemp = "ERR CORS";
-          } else {
-            currentTemp = `ERR ${xhr.status}`;
-          }
-        }
+      // Если WeatherAPI заблокирован сетью или недоступен — включаем резервный источник
+      script.onerror = function() {
+        fetchFallbackWeather();
       };
-      xhr.send();
+
+      document.body.appendChild(script);
+    }
+
+    // Обработчик ответа от WeatherAPI.com
+    window.handleWeatherAPI = function(data) {
+      if (data && data.current && typeof data.current.temp_c === "number") {
+        const temp = Math.round(data.current.temp_c);
+        currentTemp = (temp > 0 ? `+${temp}` : `${temp}`) + "°C";
+      } else {
+        fetchFallbackWeather();
+      }
+    };
+
+    // 2. Резервный источник (Open-Meteo для Киренска: 57.78, 108.12)
+    async function fetchFallbackWeather() {
+      try {
+        const res = await fetch("https://open-meteo.com");
+        const data = await res.json();
+        const temp = Math.round(data.current_weather.temperature);
+        currentTemp = (temp > 0 ? `+${temp}` : `${temp}`) + "°C";
+      } catch (e) {
+        currentTemp = "НЕТ СЕТИ";
+      }
     }
 
     function getKirenskDateTime() {
