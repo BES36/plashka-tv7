@@ -3,8 +3,9 @@
 <head>
 <meta charset="UTF-8">
 <script>
-  // 👇 1. ОСНОВНОЙ КЛЮЧ ОТ WEATHERAPI.COM (вставьте между кавычек):
-  const MY_KEY = "https://api.weatherapi.com/v1/current.json?key=5232fcf019b642c497a103208260311&q=Kirensk";
+  // 👇 Твой API-ключ WeatherAPI (только сам ключ)
+  const API_KEY = "5232fcf019b642c497a103208260311";
+  const CITY = "Kirensk";
 </script>
 <style>
   body {
@@ -47,52 +48,45 @@
   <script>
     const badge = document.getElementById("info-badge");
     let step = 0;
-    let currentTemp = "--°C";
+    let currentTemp = "ЗАГРУЗКА...";
 
-    function setTemperature(val) {
-      if (typeof val === "number" || (!isNaN(Number(val)) && val !== "")) {
-        const t = Math.round(Number(val));
-        currentTemp = (t > 0 ? `+${t}` : `${t}`) + "°C";
-      } else if (val) {
-        currentTemp = String(val);
+    function fetchWeather() {
+      if (!API_KEY || API_KEY === "ВСТАВИТЬ_СЮДА") {
+        currentTemp = "НЕТ КЛЮЧА";
+        return;
       }
-    }
 
-    // Попытка №1: Основной запрос через WeatherAPI.com
-    async function fetchWeather() {
-      const cleanKey = MY_KEY.trim();
-      if (cleanKey && cleanKey !== "ВСТАВИТЬ_СЮДА") {
-        try {
-          const res = await fetch(`https://weatherapi.com{cleanKey}&q=Kirensk&aqi=no`);
-          if (res.ok) {
-            const data = await res.json();
-            setTemperature(data.current.temp_c);
-            return;
+      const url = `https://api.weatherapi.com/v1/current.json?key=${API_KEY}&q=${CITY}&aqi=no`;
+      
+      fetch(url)
+        .then(res => {
+          if (!res.ok) throw new Error('HTTP ' + res.status);
+          return res.json();
+        })
+        .then(data => {
+          if (data && data.current && typeof data.current.temp_c === 'number') {
+            const temp = Math.round(data.current.temp_c);
+            currentTemp = (temp > 0 ? `+${temp}` : `${temp}`) + "°C";
+            // Сохраняем в кэш на случай временных сбоев сети
+            localStorage.setItem('kirensk_last_temp', currentTemp);
           }
-        } catch (e) {
-          // Переходим к резервному источнику
-        }
-      }
-      runBackupWeather();
-    }
-
-    // Попытка №2: Рабочий резервный источник Open-Meteo (координаты Киренска)
-    async function runBackupWeather() {
-      try {
-        const res = await fetch("https://api.open-meteo.com/v1/forecast?latitude=57.7833&longitude=108.1167&current_weather=true");
-        if (res.ok) {
-          const data = await res.json();
-          setTemperature(data.current_weather.temperature);
-        }
-      } catch (e) {
-        console.error("Ошибка загрузки погоды:", e);
-      }
+        })
+        .catch(err => {
+          console.error("Ошибка загрузки погоды:", err);
+          // Пытаемся достать из кэша, если сеть моргнула
+          const cached = localStorage.getItem('kirensk_last_temp');
+          if (cached) {
+            currentTemp = cached;
+          } else {
+            currentTemp = "ERR NET";
+          }
+        });
     }
 
     function getKirenskDateTime() {
       const now = new Date();
       const utcTime = now.getTime() + (now.getTimezoneOffset() * 60000);
-      const kirenskDate = new Date(utcTime + (3600000 * 8));
+      const kirenskDate = new Date(utcTime + (3600000 * 8)); // Часовой пояс Киренска (UTC+8)
 
       const day = String(kirenskDate.getDate()).padStart(2, '0');
       const month = String(kirenskDate.getMonth() + 1).padStart(2, '0');
@@ -120,11 +114,13 @@
       step = (step + 1) % 4;
     }
 
+    // Первичный запуск
     updateBadge();
     fetchWeather();
 
-    setInterval(updateBadge, 10000);
-    setInterval(fetchWeather, 15 * 60 * 1000);
+    // Интервалы
+    setInterval(updateBadge, 10000); // Смена информации каждые 10 секунд
+    setInterval(fetchWeather, 15 * 60 * 1000); // Обновление погоды каждые 15 минут
   </script>
 
 </body>
