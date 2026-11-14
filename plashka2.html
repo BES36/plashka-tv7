@@ -1,0 +1,122 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<script>
+  // 👇 ВСТАВЬТЕ ВАШ КЛЮЧ МЕЖДУ КАВЫЧЕК:
+  const MY_KEY = "https://api.weatherapi.com/v1/current.json?key=5232fcf019b642c497a103208260311&q=Kirensk";
+</script>
+<style>
+  body {
+    margin: 0;
+    padding: 0;
+    background: transparent;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    height: 100vh;
+    overflow: hidden;
+  }
+
+  .badge {
+    font-family: Arial, Helvetica, sans-serif;
+    font-weight: 300;
+    font-size: 28px;
+    color: #FFFFFF;
+    text-transform: uppercase;
+    letter-spacing: 1.5px;
+    
+    -webkit-text-stroke: 1.5px #000000;
+    paint-order: stroke fill;
+    text-shadow: 
+      -1px -1px 0 #000,  
+       1px -1px 0 #000,
+      -1px  1px 0 #000,
+       1px  1px 0 #000;
+
+    transition: none !important;
+    animation: none !important;
+    user-select: none;
+  }
+</style>
+</head>
+<body>
+
+  <div id="info-badge" class="badge">КИРЕНСК</div>
+
+  <script>
+    const badge = document.getElementById("info-badge");
+    let step = 0;
+    let currentTemp = "ЗАГРУЗКА...";
+
+    function fetchWeather() {
+      const cleanKey = MY_KEY.trim();
+      if (!cleanKey || cleanKey === "ВСТАВИТЬ_СЮДА") {
+        currentTemp = "НЕТ КЛЮЧА";
+        return;
+      }
+
+      const url = `https://weatherapi.com{cleanKey}&q=Kirensk&aqi=no`;
+      const xhr = new XMLHttpRequest();
+      xhr.open("GET", url, true);
+      
+      xhr.onreadystatechange = function () {
+        if (xhr.readyState === 4) {
+          if (xhr.status === 200) {
+            try {
+              const data = JSON.parse(xhr.responseText);
+              const temp = Math.round(data.current.temp_c);
+              currentTemp = (temp > 0 ? `+${temp}` : `${temp}`) + "°C";
+            } catch (e) {
+              currentTemp = "ERR JSON";
+            }
+          } else if (xhr.status === 0) {
+            currentTemp = "ERR CORS";
+          } else {
+            currentTemp = `ERR ${xhr.status}`;
+          }
+        }
+      };
+      xhr.send();
+    }
+
+    function getKirenskDateTime() {
+      const now = new Date();
+      const utcTime = now.getTime() + (now.getTimezoneOffset() * 60000);
+      const kirenskDate = new Date(utcTime + (3600000 * 8));
+
+      const day = String(kirenskDate.getDate()).padStart(2, '0');
+      const month = String(kirenskDate.getMonth() + 1).padStart(2, '0');
+      const year = kirenskDate.getFullYear();
+
+      const hours = String(kirenskDate.getHours()).padStart(2, '0');
+      const minutes = String(kirenskDate.getMinutes()).padStart(2, '0');
+
+      return {
+        dateStr: `${day}.${month}.${year}`,
+        timeStr: `${hours}:${minutes}`
+      };
+    }
+
+    function updateBadge() {
+      const dt = getKirenskDateTime();
+
+      switch (step) {
+        case 0: badge.textContent = "КИРЕНСК"; break;
+        case 1: badge.textContent = dt.dateStr; break;
+        case 2: badge.textContent = dt.timeStr; break;
+        case 3: badge.textContent = currentTemp; break;
+      }
+
+      step = (step + 1) % 4;
+    }
+
+    updateBadge();
+    fetchWeather();
+
+    setInterval(updateBadge, 10000);
+    setInterval(fetchWeather, 15 * 60 * 1000);
+  </script>
+
+</body>
+</html>
